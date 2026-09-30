@@ -1,0 +1,76 @@
+name: Build v2rayNG
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-35"
+          yes | sdkmanager --licenses
+
+      - name: Check project
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Project files:"
+          ls -la
+
+          if [ ! -f "./gradlew" ]; then
+            echo "ERROR: gradlew not found!"
+            exit 1
+          fi
+
+          chmod +x ./gradlew
+
+      - name: Build APK
+        run: |
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Find APK
+        run: |
+          mkdir -p output
+
+          APK=$(find . -type f -name "*.apk" | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK was not created."
+            exit 1
+          fi
+
+          echo "APK found: $APK"
+          cp "$APK" output/v2rayNG-custom.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2rayNG-custom
+          path: output/v2rayNG-custom.apk
+          if-no-files-found: error
